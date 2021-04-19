@@ -195,7 +195,7 @@ dependencies:
 
 #### 2. Snakemake 
 
-- Reference: [Snakemake doc](https://snakemake.readthedocs.io/en/stable)
+- Reference: [Snakemake doc](https://snakemake.readthedocs.io/en/stable), [STAR manual](https://github.com/alexdobin/STAR/blob/master/doc/STARmanual.pdf)
 
 - [Snakefile](https://github.com/Mira0507/snakemake_star/blob/master/Snakefile)
 
