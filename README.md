@@ -320,7 +320,3 @@ INPUT_EXT: '.fastq.gz'
   
 ```
 
-
-#### 3. Error 
-
-- [errors](https://github.com/Mira0507/snakemake_alignment/tree/master/errors): error nots 
