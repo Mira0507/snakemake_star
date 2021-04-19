@@ -2,6 +2,7 @@
 
 #### 1. Conda environment
 
+- References: [Conda doc](https://docs.conda.io/projects/conda/en/latest/index.html), [sra-tools](https://github.com/ncbi/sra-tools), [Snakemake Installation Guide](https://snakemake.readthedocs.io/en/stable/getting_started/installation.html)
 - [config/conda_env.yml](https://github.com/Mira0507/snakemake_star/blob/master/config/conda_env.yml)
 
 ```
@@ -194,6 +195,8 @@ dependencies:
 
 #### 2. Snakemake 
 
+- Reference: [Snakemake doc](https://snakemake.readthedocs.io/en/stable)
+
 - [Snakefile](https://github.com/Mira0507/snakemake_star/blob/master/Snakefile)
 
 ```
@@ -320,3 +323,42 @@ INPUT_EXT: '.fastq.gz'
   
 ```
 
+#### 3. Running the Snakemake workflow
+
+- Reference: [Snakemake Command Line Arguments](https://snakemake.readthedocs.io/en/stable/executing/cli.html)
+
+- **Dry run**
+
+
+```bash
+#!/bin/bash
+
+snakemake -n
+
+```
+
+
+- **DAG visualization** 
+
+
+```bash
+#!/bin/bash
+
+
+# The dot commend requires graphviz (downloadable via conda)
+snakemake --dag | dot -Tpdf > dag.pdf
+
+
+```
+
+
+- **Run**
+
+
+```bash
+#!/bin/bash
+
+# Either -j or --cores assignes the number of cores
+snakemake -j 8
+
+```
