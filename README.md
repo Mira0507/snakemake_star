@@ -163,11 +163,6 @@ INDEX_STAR: "/home/mira/Documents/programming/Bioinformatics/snakemake_star_hisa
 
 
 
-
-STAR_OUT: "star_output"  # Assigns STAR output directory
-
-
-
 FASTQ_EXT: '.fastq.gz'
 
 
@@ -211,10 +206,6 @@ REFERENCE_LINK:
 
 INDEX_STAR: "/home/mira/Documents/programming/Bioinformatics/snakemake_star_hisat/reference/star_index" # Assigns path to star indexing directory (ABSOLUTE PATH NEEDED due to a potential STAR error!)
 
-
-
-
-STAR_OUT: "star_output"  # Assigns STAR output directory
 
 
 
