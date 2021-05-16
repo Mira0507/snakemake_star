@@ -165,7 +165,7 @@ FASTQ_EXT: '.fastq.gz'
 ```
 
 
-- [config/config_paired1.yaml (paired-end testing)](https://github.com/Mira0507/snakemake_star/blob/master/config/config_paired.yaml)
+- [config/config_paired1.yaml (paired-end testing)](https://github.com/Mira0507/snakemake_star/blob/master/config/config_paired1.yaml)
 
 
 ```yaml
