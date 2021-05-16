@@ -27,41 +27,41 @@ configfile:"config/config_single.yaml"    # Sets path to the config file
 shell.prefix('set -euo pipefail; ')
 shell.executable('/bin/bash')
 
-rule all:
-    input:
-        expand("star_output/{sample}Aligned.sortedByCoord.out.bam", 
-               sample=config["FASTQ_PREFIX"])
+
+
+rule all: 
+    input: 
+        expand("reference/{ref}", ref=config['REFERENCE'][1:]),  # Reference genome and annotation (GTF) files
+        expand("star_output/{sample}Aligned.sortedByCoord.out.bam", sample=list(config['SAMPLE'].keys()))  # STAR output BAM files
 
 rule get_reference:    
     """
-    This rule downloads reference files
+    This rule downloads and decompresses reference files
     """
     params:
-        gen_link=config['REFERENCE_LINK']['GENOME'][0],   # Gencode reference genome file link 
-        gen_name=config['REFERENCE_LINK']['GENOME'][1],   # Output reference genome location & name 
-        anno_link=config['REFERENCE_LINK']['ANNOTATION'][0],  # Gencode GTF (annotation) file link
-        anno_name=config['REFERENCE_LINK']['ANNOTATION'][1]   # Output GTF file location & name
+        reflink=config['REFERENCE'][0]
     output:
-        gen=expand("reference/{gen}", gen=config['REFERENCE_LINK']['GENOME'][2]),  # Decompressed reference genome file 
-        anno=expand("reference/{anno}", anno=config['REFERENCE_LINK']['ANNOTATION'][2])  # Decompressed GTF file
-    shell:
-        "set +o pipefail; "
-        "wget -c {params.gen_link} -O reference/{params.gen_name} && "
-        "wget -c {params.anno_link} -O reference/{params.anno_name} && "
-        "gzip -d reference/*.gz"
+        "reference/{ref}"  # Decompressed reference files
+    run:
+        link=params.reflink + wildcards.ref
+        shell("set +o pipefail; " 
+              "wget -c {link}.gz -O {output}.gz && " 
+              "gzip -d {output}.gz")
+
+
 
 rule index_star:
     """
     This rule constructs STAR index files
     """
     input:
-        fa=expand("reference/{gen}", gen=config['REFERENCE_LINK']['GENOME'][2]),  # Decompressed reference genome file
-        gtf=expand("reference/{anno}", anno=config['REFERENCE_LINK']['ANNOTATION'][2])  # Decompressed GTF file
+        fa=expand("reference/{gen}", gen=config['REFERENCE'][1]),  # Decompressed reference genome file
+        gtf=expand("reference/{anno}", anno=config['REFERENCE'][2])  # Decompressed GTF file
     output:
         "reference/star_index/Genome",   # STAR indexing files
         "reference/star_index/SA",       # STAR indexing files
         "reference/star_index/SAindex"   # STAR indexing files
-    threads: 8
+    threads: 16
     shell:
         "set +o pipefail; "
         "STAR --runThreadN {threads} "
@@ -71,54 +71,51 @@ rule index_star:
         "--sjdbGTFfile {input.gtf}"
 
 
-rule align_star:   # Creates bam files in star_output directory"
+
+
+rule align_star:   # Creates bam files in star_output directory
     """
     This rule aligns the reads using STAR two-pass mode
     """
     input:
-        gtf=expand("reference/{gen}", gen=config['REFERENCE_LINK']['ANNOTATION'][2]),  # Decompressed GTF file
-        fastq=expand("fastq/{sample}_{end}.fastq.gz", sample=config['FASTQ_PREFIX'], end=config['END']),                  # Gzipped FASTQ files
-        index1="reference/star_index/Genome",
+        gtf=expand("reference/{anno}", anno=config['REFERENCE'][2]),   # Decompressed GTF file
+        fastq=expand("fastq/{{sample}}_{end}.fastq.gz", end=config['END']),    # Gzipped FASTQ files
+        index1="reference/star_index/Genome",  # STAR indexing files
         index2="reference/star_index/SA",
         index3="reference/star_index/SAindex"
     output:
-        expand("star_output/{sample}Aligned.sortedByCoord.out.bam", sample=config['FASTQ_PREFIX'])  # Bam files
+        "star_output/{sample}Aligned.sortedByCoord.out.bam"     # Bam files
     params:
         indexing=config["INDEX_STAR"],  # STAR indexing file directory
-        files=config["FASTQ_PREFIX"],   # e.g. Ctrl, Treatment
         ext=config['FASTQ_EXT']         # extension of the FASTQ files (e.g. fastq.gz)
-    threads: 8
+    threads: 16
     run:
-        for i in range(len(params.files)):
-            p=params.files[i]
-            r1= "fastq/" + params.files[i] + "_1" + params.ext + " " 
-            r2=""
-            if len(input.fastq) == 2 * len(params.files): 
-                r2= "fastq/" + params.files[i] + "_2" + params.ext + " " 
-            shell("STAR --runThreadN {threads} "  
-                    "--runMode alignReads "  
-                    "--readFilesCommand zcat "
-                    "--genomeDir {params.indexing} " 
-                    "--sjdbGTFfile {input.gtf} "  
-                    "--sjdbOverhang 100 "  
-                    "--readFilesIn {r1}{r2}"  
-                    "--outFileNamePrefix star_output/{p} "
-                    "--outFilterType BySJout "  
-                    "--outFilterMultimapNmax 20 "
-                    "--alignSJoverhangMin 8 "
-                    "--alignSJDBoverhangMin 1 "
-                    "--outFilterMismatchNmax 999 "
-                    "--outFilterMismatchNoverReadLmax 0.04 "
-                    "--alignIntronMin 20 "
-                    "--alignIntronMax 1000000 "
-                    "--outSAMunmapped None "
-                    "--outSAMtype BAM "
-                    "SortedByCoordinate "
-                    "--quantMode GeneCounts "
-                    "--twopassMode Basic "
-                    "--chimOutType Junctions")     
-
-
+        r1= "fastq/" + wildcards.sample + "_1" + params.ext + " " 
+        r2=""
+        if len(input.fastq) == 2:   # if paired-end
+            r2= "fastq/" + wildcards.sample + "_2" + params.ext + " " 
+        shell("STAR --runThreadN {threads} "  
+                "--runMode alignReads "  
+                "--readFilesCommand zcat "
+                "--genomeDir {params.indexing} " 
+                "--sjdbGTFfile {input.gtf} "  
+                "--sjdbOverhang 100 "  
+                "--readFilesIn {r1}{r2}"  
+                "--outFileNamePrefix star_output/{wildcards.sample} "
+                "--outFilterType BySJout "  
+                "--outFilterMultimapNmax 20 "
+                "--alignSJoverhangMin 8 "
+                "--alignSJDBoverhangMin 1 "
+                "--outFilterMismatchNmax 999 "
+                "--outFilterMismatchNoverReadLmax 0.04 "
+                "--alignIntronMin 20 "
+                "--alignIntronMax 1000000 "
+                "--outSAMunmapped None "
+                "--outSAMtype BAM "
+                "SortedByCoordinate "
+                "--quantMode GeneCounts "
+                "--twopassMode Basic "
+                "--chimOutType Junctions")   
 ```
 
 - [config/config_single.yaml (single-end testing)](https://github.com/Mira0507/snakemake_star/blob/master/config/config_single.yaml)
@@ -129,34 +126,32 @@ rule align_star:   # Creates bam files in star_output directory"
 
 ###################### Sample info ######################
 
+SAMPLE:
+  DMSO_rep1: SRR13190144
+  DMSO_rep2: SRR13190145
+  DMSO_rep3: SRR13190146
+  SR0813_rep1: SRR13190150
+  SR0813_rep2: SRR13190151
+  SR0813_rep3: SRR13190152
+
+
 END: 
   - 1
-
-
-
-FASTQ_PREFIX:
-  - DMSO_rep1
-  - DMSO_rep2
-  - DMSO_rep3
-  - SR0813_rep1
-  - SR0813_rep2
-  - SR0813_rep3
 
 
 ###################### Reference info ######################
 
 
-REFERENCE_LINK:
-  GENOME: 
-    - 'ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_37/GRCh38.primary_assembly.genome.fa.gz'
-    - 'GRCh38.primary_assembly.genome.fa.gz'
-    - 'GRCh38.primary_assembly.genome.fa'
-  ANNOTATION: 
-    - 'ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_37/gencode.v37.primary_assembly.annotation.gtf.gz'
-    - 'gencode.v37.primary_assembly.annotation.gtf.gz'
-    - 'gencode.v37.primary_assembly.annotation.gtf'
-
-
+REFERENCE:
+  - 'ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_37/'
+  - 'GRCh38.primary_assembly.genome.fa'
+  - 'gencode.v37.primary_assembly.annotation.gtf'
+  
+# e.g. 
+# Reference genome link: ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_37/GRCh38.primary_assembly.genome.fa.gz
+# Reference annotation (GTF) link: ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_37/gencode.v37.primary_assembly.annotation.gtf.gz 
+#
+#
 ###################### Extra-setting info ######################
 
 INDEX_STAR: "/home/mira/Documents/programming/Bioinformatics/snakemake_star_hisat/reference/star_index" # Assigns path to star indexing directory (ABSOLUTE PATH NEEDED due to a potential STAR error!)
@@ -164,6 +159,7 @@ INDEX_STAR: "/home/mira/Documents/programming/Bioinformatics/snakemake_star_hisa
 
 
 FASTQ_EXT: '.fastq.gz'
+
 
 
 ```
@@ -176,30 +172,33 @@ FASTQ_EXT: '.fastq.gz'
 
 ###################### Sample info ######################
 
+SAMPLE:
+  Treated_rep1: SRR6461133
+  Treated_rep2: SRR6461134
+  Treated_rep3: SRR6461135
+  Control_rep1: SRR6461139 
+  Control_rep2: SRR6461140
+  Control_rep3: SRR6461141
+
+
+
 END: 
   - 1
   - 2
 
 
+
+###################### Reference info ########################
+
+REFERENCE:
+  - 'ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_37/'
+  - 'GRCh38.primary_assembly.genome.fa'
+  - 'gencode.v37.primary_assembly.annotation.gtf'
   
-FASTQ_PREFIX:
-  - Untreated1
-  - Untreated2
-  - Treated1
-  - Treated2
+# e.g. 
+# Reference genome link: ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_37/GRCh38.primary_assembly.genome.fa.gz
+# Reference annotation (GTF) link: ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_37/gencode.v37.primary_assembly.annotation.gtf.gz 
 
-###################### Reference info ######################
-
-
-REFERENCE_LINK:
-  GENOME: 
-    - 'ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_37/GRCh38.primary_assembly.genome.fa.gz'
-    - 'GRCh38.primary_assembly.genome.fa.gz'
-    - 'GRCh38.primary_assembly.genome.fa'
-  ANNOTATION: 
-    - 'ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_37/gencode.v37.primary_assembly.annotation.gtf.gz'
-    - 'gencode.v37.primary_assembly.annotation.gtf.gz'
-    - 'gencode.v37.primary_assembly.annotation.gtf'
 
 
 ###################### Extra-setting info ######################
@@ -208,10 +207,7 @@ INDEX_STAR: "/home/mira/Documents/programming/Bioinformatics/snakemake_star_hisa
 
 
 
-
 FASTQ_EXT: '.fastq.gz'
-
-
 
 ```
 
@@ -251,6 +247,6 @@ snakemake --dag | dot -Tpdf > dag.pdf
 #!/bin/bash
 
 # Either -j or --cores assignes the number of cores
-snakemake -j 8
+snakemake -j 10
 
 ```
