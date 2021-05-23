@@ -1,6 +1,6 @@
 
 #################################### Defined by users #################################
-configfile:"config/config_paired1.yaml"    # Sets path to the config file
+configfile:"config/config_single.yaml"    # Sets path to the config file
 
 #######################################################################################
 
@@ -28,8 +28,7 @@ rule get_reference:
         "reference/{ref}"  # Decompressed reference files
     run:
         link=params.reflink + wildcards.ref
-        shell("set +o pipefail; " 
-              "wget -c {link}.gz -O {output}.gz && " 
+        shell("wget -c {link}.gz -O {output}.gz && " 
               "gzip -d {output}.gz")
 
 
@@ -47,7 +46,6 @@ rule index_star:
         "reference/star_index/SAindex"   # STAR indexing files
     threads: 16
     shell:
-        "set +o pipefail; "
         "STAR --runThreadN {threads} "
         "--runMode genomeGenerate "
         "--genomeDir reference/star_index "
