@@ -13,10 +13,8 @@
 - [Snakefile](https://github.com/Mira0507/snakemake_star/blob/master/Snakefile)
 
 ```
-
-
 #################################### Defined by users #################################
-configfile:"config/config_single.yaml"    # Sets path to the config file
+configfile:"config/config_single1.yaml"    # Sets path to the config file
 
 #######################################################################################
 
@@ -24,8 +22,6 @@ configfile:"config/config_single.yaml"    # Sets path to the config file
 # e.g. paired-end: DMSO_rep1_1.fastq.gz, DMSO_rep1_2.fastq.gz, Drug_rep1_1.fastq.gz, Drug_rep1_2.fastq.gz 
 #      single-end: DMSO_rep1_1.fastq.gz, Drug_rep1_1.fastq.gz
 
-shell.prefix('set -euo pipefail; ')
-shell.executable('/bin/bash')
 
 
 
@@ -44,8 +40,7 @@ rule get_reference:
         "reference/{ref}"  # Decompressed reference files
     run:
         link=params.reflink + wildcards.ref
-        shell("set +o pipefail; " 
-              "wget -c {link}.gz -O {output}.gz && " 
+        shell("wget -c {link}.gz -O {output}.gz && " 
               "gzip -d {output}.gz")
 
 
@@ -63,7 +58,6 @@ rule index_star:
         "reference/star_index/SAindex"   # STAR indexing files
     threads: 16
     shell:
-        "set +o pipefail; "
         "STAR --runThreadN {threads} "
         "--runMode genomeGenerate "
         "--genomeDir reference/star_index "
@@ -116,6 +110,7 @@ rule align_star:   # Creates bam files in star_output directory
                 "--quantMode GeneCounts "
                 "--twopassMode Basic "
                 "--chimOutType Junctions")   
+
 ```
 
 - [config/config_single.yaml (single-end testing)](https://github.com/Mira0507/snakemake_star/blob/master/config/config_single.yaml)
