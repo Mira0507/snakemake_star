@@ -1,6 +1,6 @@
 
 #################################### Defined by users #################################
-configfile:"config/config_single.yaml"    # Sets path to the config file
+configfile:"config/config_single1.yaml"    # Sets path to the config file
 
 #######################################################################################
 
@@ -8,8 +8,6 @@ configfile:"config/config_single.yaml"    # Sets path to the config file
 # e.g. paired-end: DMSO_rep1_1.fastq.gz, DMSO_rep1_2.fastq.gz, Drug_rep1_1.fastq.gz, Drug_rep1_2.fastq.gz 
 #      single-end: DMSO_rep1_1.fastq.gz, Drug_rep1_1.fastq.gz
 
-shell.prefix('set -euo pipefail; ')
-shell.executable('/bin/bash')
 
 
 
