@@ -3,7 +3,7 @@
 #### 1. Conda environment
 
 - References: [Conda doc](https://docs.conda.io/projects/conda/en/latest/index.html), [sra-tools](https://github.com/ncbi/sra-tools), [Snakemake Installation Guide](https://snakemake.readthedocs.io/en/stable/getting_started/installation.html)
-- Recipe: [config/conda_env.yml](https://github.com/Mira0507/snakemake_star/blob/master/config/conda_env.yml)
+- Config: [config/conda_env.yaml](https://github.com/Mira0507/snakemake_star/blob/master/config/conda_env.yaml)
 
 
 #### 2. Snakemake 
@@ -13,8 +13,10 @@
 - [Snakefile](https://github.com/Mira0507/snakemake_star/blob/master/Snakefile)
 
 ```
+
+
 #################################### Defined by users #################################
-configfile:"config/config_single1.yaml"    # Sets path to the config file
+configfile:"config/config_paired1.yaml"    # Sets path to the config file
 
 #######################################################################################
 
@@ -27,15 +29,15 @@ configfile:"config/config_single1.yaml"    # Sets path to the config file
 
 rule all: 
     input: 
-        expand("reference/{ref}", ref=config['REFERENCE'][1:]),  # Reference genome and annotation (GTF) files
-        expand("star_output/{sample}Aligned.sortedByCoord.out.bam", sample=list(config['SAMPLE'].keys()))  # STAR output BAM files
+        expand("reference/{ref}", ref=list(config['REFERENCE']['FILE'].values())),   # Reference genome and annotation (GTF) files
+        expand("star_output/{sample}.bam", sample=list(config['SAMPLE'].keys()))  # STAR output BAM files
 
 rule get_reference:    
     """
     This rule downloads and decompresses reference files
     """
     params:
-        reflink=config['REFERENCE'][0]
+        reflink=config['REFERENCE']['LINK']
     output:
         "reference/{ref}"  # Decompressed reference files
     run:
@@ -50,12 +52,10 @@ rule index_star:
     This rule constructs STAR index files
     """
     input:
-        fa=expand("reference/{gen}", gen=config['REFERENCE'][1]),  # Decompressed reference genome file
-        gtf=expand("reference/{anno}", anno=config['REFERENCE'][2])  # Decompressed GTF file
+        fa=expand("reference/{gen}", gen=config['REFERENCE']['FILE']['GENOME']),  # Decompressed reference genome file
+        gtf=expand("reference/{anno}", anno=config['REFERENCE']['FILE']['ANNOTATION'])  # Decompressed GTF file
     output:
-        "reference/star_index/Genome",   # STAR indexing files
-        "reference/star_index/SA",       # STAR indexing files
-        "reference/star_index/SAindex"   # STAR indexing files
+        expand("reference/star_index/{index}", index=config['INDEX_STAR']['FILE'])
     threads: 16
     shell:
         "STAR --runThreadN {threads} "
@@ -64,23 +64,18 @@ rule index_star:
         "--genomeFastaFiles {input.fa} "
         "--sjdbGTFfile {input.gtf}"
 
-
-
-
-rule align_star:   # Creates bam files in star_output directory
+rule align_star:   # Creates bam files in star_output directory"
     """
     This rule aligns the reads using STAR two-pass mode
     """
     input:
-        gtf=expand("reference/{anno}", anno=config['REFERENCE'][2]),   # Decompressed GTF file
+        gtf=expand("reference/{anno}", anno=config['REFERENCE']['FILE']['ANNOTATION']),   # Decompressed GTF file
         fastq=expand("fastq/{{sample}}_{end}.fastq.gz", end=config['END']),    # Gzipped FASTQ files
-        index1="reference/star_index/Genome",  # STAR indexing files
-        index2="reference/star_index/SA",
-        index3="reference/star_index/SAindex"
+        index=expand("reference/star_index/{index}", index=config['INDEX_STAR']['FILE']) # STAR indexing files
     output:
-        "star_output/{sample}Aligned.sortedByCoord.out.bam"     # Bam files
+        "star_output/{sample}.bam"     # Bam files
     params:
-        indexing=config["INDEX_STAR"],  # STAR indexing file directory
+        indexing=config["INDEX_STAR"]['DIR'],  # STAR indexing file directory
         ext=config['FASTQ_EXT']         # extension of the FASTQ files (e.g. fastq.gz)
     threads: 16
     run:
@@ -109,7 +104,8 @@ rule align_star:   # Creates bam files in star_output directory
                 "SortedByCoordinate "
                 "--quantMode GeneCounts "
                 "--twopassMode Basic "
-                "--chimOutType Junctions")   
+                "--chimOutType Junctions && "
+              "mv star_output/{wildcards.sample}Aligned.sortedByCoord.out.bam {output}")   
 
 ```
 
@@ -138,9 +134,10 @@ END:
 
 
 REFERENCE:
-  - 'ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_37/'
-  - 'GRCh38.primary_assembly.genome.fa'
-  - 'gencode.v37.primary_assembly.annotation.gtf'
+  LINK: 'ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_37/'
+  FILE: 
+    GENOME: 'GRCh38.primary_assembly.genome.fa'
+    ANNOTATION: 'gencode.v37.primary_assembly.annotation.gtf'
   
 # e.g. 
 # Reference genome link: ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_37/GRCh38.primary_assembly.genome.fa.gz
@@ -149,14 +146,15 @@ REFERENCE:
 #
 ###################### Extra-setting info ######################
 
-INDEX_STAR: "/home/mira/Documents/programming/Bioinformatics/snakemake_star_hisat/reference/star_index" # Assigns path to star indexing directory (ABSOLUTE PATH NEEDED due to a potential STAR error!)
-
+INDEX_STAR: 
+  DIR: "reference/star_index" # Assigns path to star indexing directory (assign ABSOLUTE PATH if STAR generates an error)
+  FILE: 
+    - "Genome"
+    - "SA"
+    - "SAindex"
 
 
 FASTQ_EXT: '.fastq.gz'
-
-
-
 ```
 
 
@@ -165,7 +163,10 @@ FASTQ_EXT: '.fastq.gz'
 
 ```yaml
 
+
+
 ###################### Sample info ######################
+
 
 SAMPLE:
   Treated_rep1: SRR6461133
@@ -181,14 +182,13 @@ END:
   - 1
   - 2
 
-
-
 ###################### Reference info ########################
 
 REFERENCE:
-  - 'ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_37/'
-  - 'GRCh38.primary_assembly.genome.fa'
-  - 'gencode.v37.primary_assembly.annotation.gtf'
+  LINK: 'ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_37/'
+  FILE: 
+    GENOME: 'GRCh38.primary_assembly.genome.fa'
+    ANNOTATION: 'gencode.v37.primary_assembly.annotation.gtf'
   
 # e.g. 
 # Reference genome link: ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_37/GRCh38.primary_assembly.genome.fa.gz
@@ -198,7 +198,12 @@ REFERENCE:
 
 ###################### Extra-setting info ######################
 
-INDEX_STAR: "/home/mira/Documents/programming/Bioinformatics/snakemake_star_hisat/reference/star_index" # Assigns path to star indexing directory (ABSOLUTE PATH NEEDED due to a potential STAR error!)
+INDEX_STAR: 
+  DIR: "reference/star_index" # Assigns path to star indexing directory (assign ABSOLUTE PATH if STAR generates an error)
+  FILE: 
+    - "Genome"
+    - "SA"
+    - "SAindex"
 
 
 
